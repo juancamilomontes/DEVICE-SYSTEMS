@@ -1,0 +1,6 @@
+# Dependencias principales de device_systems.
+# El proyecto usa `uv` (ver pyproject.toml); este archivo es equivalente para
+# quien prefiera instalar con pip:  pip install -r requirements.txt
+fastapi>=0.141.1
+uvicorn[standard]>=0.52.4
+pydantic[email]>=2.0
