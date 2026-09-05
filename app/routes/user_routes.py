@@ -7,8 +7,12 @@ cómo se guardan los usuarios.
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from app.dependencies.user_dependencies import get_user_or_404, get_user_service
-from app.schemas.user_schema import UserCreate, UserResponse, UserRole
+from app.dependencies.user_dependencies import (
+    get_user_or_404,
+    get_user_service,
+    verify_api_key,
+)
+from app.schemas.user_schema import UserCreate, UserResponse, UserRole, UserUpdate
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -61,3 +65,80 @@ def crear_usuario(
             detail=f"El correo {datos.email} ya está registrado",
         )
     return service.create_user(datos)
+
+
+# --- PUT /users/{user_id} ---------------------------------------------------
+@router.put(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Actualizar usuario (completo)",
+    response_description="Usuario reemplazado por completo",
+)
+def reemplazar_usuario(
+    datos: UserCreate,
+    user: dict = Depends(get_user_or_404),
+    service: UserService = Depends(get_user_service),
+):
+    """Reemplaza TODOS los campos de un usuario existente.
+
+    Requiere enviar name, email, role e is_active. Devuelve 404 si no existe
+    y 400 si el nuevo correo ya lo usa otro usuario.
+    """
+    if service.email_exists(datos.email, exclude_id=user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El correo {datos.email} ya está registrado por otro usuario",
+        )
+    return service.replace_user(user, datos)
+
+
+# --- PATCH /users/{user_id} -------------------------------------------------
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Actualizar usuario (parcial)",
+    response_description="Usuario actualizado parcialmente",
+)
+def actualizar_usuario_parcial(
+    datos: UserUpdate,
+    user: dict = Depends(get_user_or_404),
+    service: UserService = Depends(get_user_service),
+):
+    """Actualiza solo los campos enviados.
+
+    Si no se envía ningún campo, responde 400. 404 si el usuario no existe y
+    400 si el nuevo correo ya lo usa otro usuario.
+    """
+    # exclude_unset=True => solo lo que el cliente envió realmente.
+    cambios = datos.model_dump(mode="json", exclude_unset=True)
+    if not cambios:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Debe enviar al menos un campo para actualizar",
+        )
+    if "email" in cambios and service.email_exists(cambios["email"], exclude_id=user["id"]):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"El correo {cambios['email']} ya está registrado por otro usuario",
+        )
+    return service.apply_changes(user, cambios)
+
+
+# --- DELETE /users/{user_id} ------------------------------------------------
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Eliminar usuario",
+    response_description="Usuario eliminado (sin contenido)",
+    dependencies=[Depends(verify_api_key)],
+)
+def eliminar_usuario(
+    user: dict = Depends(get_user_or_404),
+    service: UserService = Depends(get_user_service),
+):
+    """Elimina un usuario existente. Devuelve 204 sin cuerpo.
+
+    Requiere la cabecera `X-API-Key: device-systems-2026` (auth simulada).
+    404 si el usuario no existe.
+    """
+    service.delete_user(user)
