@@ -141,13 +141,20 @@ Thunder Client.
 
 ## Capturas de Swagger UI
 
-> Pegar aquí las capturas de pantalla solicitadas por la evidencia:
->
-> - [ ] Vista general de Swagger UI (`/docs`)
-> - [ ] `GET /users`
-> - [ ] `GET /users/{user_id}`
-> - [ ] `POST /users`
-> - [ ] Evidencia de validaciones / errores (422, 404, 409)
+### Vista general de Swagger UI
+![Swagger UI general](images/swagger-general.png)
+
+### GET /users
+![GET /users](images/get-users.png)
+
+### GET /users/{user_id}
+![GET users por id](images/get-user-id.png)
+
+### POST /users
+![POST /users](images/post-users.png)
+
+### Evidencia de validación (error 422)
+![Error 422 validación](images/error-422.png)
 
 ## Reflexión sobre el uso de FastAPI
 
