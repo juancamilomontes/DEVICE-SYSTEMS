@@ -1,20 +1,28 @@
 [project]
 name = "device-systems"
 version = "0.1.0"
-description = "Add your description here"
+description = "API REST para la gestión de usuarios del sistema device_systems (FastAPI)."
 readme = "README.md"
+requires-python = ">=3.11"
 authors = [
     { name = "Juan Camilo Montes", email = "jm3876602@gmail.com" }
 ]
-requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.141.1",
     "uvicorn[standard]>=0.52.4",
+    "pydantic[email]>=2.0",
 ]
 
-[project.scripts]
-device-systems = "device_systems:main"
+[dependency-groups]
+dev = [
+    "httpx>=0.27",
+    "pytest>=8.0",
+]
 
-[build-system]
-requires = ["uv_build>=0.12.5,<0.13.0"]
-build-backend = "uv_build"
+# La app NO es una librería instalable, así que no se construye como paquete.
+[tool.uv]
+package = false
+
+# Permite que pytest encuentre el paquete `app` desde la raíz del proyecto.
+[tool.pytest.ini_options]
+pythonpath = ["."]
