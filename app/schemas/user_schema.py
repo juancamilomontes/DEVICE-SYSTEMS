@@ -44,6 +44,20 @@ class UserCreate(UserBase):
     pass
 
 
+class UserUpdate(BaseModel):
+    """Modelo de ENTRADA para PATCH /users/{id} (actualización parcial).
+
+    TODOS los campos son opcionales: el cliente envía solo los que quiere
+    cambiar. Los que no envíe quedan "sin definir" (no como None), y con
+    `exclude_unset=True` la ruta sabe exactamente qué se pidió actualizar.
+    """
+
+    name: str | None = Field(default=None, min_length=3, description="Nuevo nombre (mín. 3 caracteres)")
+    email: EmailStr | None = Field(default=None, description="Nuevo correo válido")
+    role: UserRole | None = Field(default=None, description="Nuevo rol: admin, support o user")
+    is_active: bool | None = Field(default=None, description="Nuevo estado activo/inactivo")
+
+
 class UserResponse(UserBase):
     """Modelo de SALIDA (response_model).
 
