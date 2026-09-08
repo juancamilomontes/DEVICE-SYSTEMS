@@ -5,8 +5,9 @@ automática (Swagger/OpenAPI y ReDoc), registra el router de usuarios y agrega
 un middleware con cabeceras HTTP personalizadas.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 
+from app.dependencies.user_dependencies import get_api_settings
 from app.routes import user_routes
 
 # Descripción larga (se muestra en la portada de Swagger UI / ReDoc).
@@ -42,7 +43,7 @@ app = FastAPI(
 async def agregar_cabeceras_personalizadas(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "1.0"
+    response.headers["X-API-Version"] = "2.0"
     return response
 
 
@@ -62,3 +63,13 @@ def read_estado():
         "Estado": "La aplicación está funcionando correctamente.",
         "server": "FastAPI",
     }
+
+
+@app.get("/info", tags=["root"], summary="Información/configuración de la API")
+def read_info(settings: dict = Depends(get_api_settings)):
+    """Devuelve la configuración general de la API.
+
+    Los datos los provee la dependencia `get_api_settings` mediante Depends(),
+    demostrando la inyección de configuración reutilizable.
+    """
+    return settings
