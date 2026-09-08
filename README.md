@@ -218,16 +218,41 @@ Postman o Thunder Client.
 
 ## Capturas de Swagger UI y ReDoc
 
-> Pegar aquí las capturas de la evidencia (ver instrucciones más abajo):
->
-> - [ ] Swagger UI general (`/docs`)
-> - [ ] ReDoc (`/redoc`)
-> - [ ] GET /users y GET /users/{user_id}
-> - [ ] POST /users
-> - [ ] PUT /users/{user_id}
-> - [ ] PATCH /users/{user_id}
-> - [ ] DELETE /users/{user_id}
-> - [ ] Errores controlados (404, 400 PATCH vacío, 401 sin API Key, 422)
+### Swagger UI (vista general)
+![Swagger UI general](images/swagger-general.png)
+
+### GET /users
+![GET /users](images/get-users.png)
+
+### GET /users/{user_id}
+![GET usuario por id](images/get-user-id.png)
+
+### POST /users
+![POST /users](images/post-users.png)
+
+### PUT /users/{user_id}
+<!-- Pega aquí la captura y descomenta la línea siguiente -->
+<!-- ![PUT /users](images/put-users.png) -->
+
+### PATCH /users/{user_id}
+<!-- ![PATCH /users](images/patch-users.png) -->
+
+### DELETE /users/{user_id}
+<!-- ![DELETE /users](images/delete-users.png) -->
+
+### ReDoc (/redoc)
+<!-- ![ReDoc](images/redoc.png) -->
+
+### Errores controlados
+
+**422 — datos inválidos**
+![Error 422](images/error-422.png)
+
+**400 — PATCH sin datos**
+<!-- ![Error 400 PATCH vacío](images/error-400-patch.png) -->
+
+**401 — DELETE sin API Key**
+<!-- ![Error 401 sin API Key](images/error-401.png) -->
 
 ## Reflexión final sobre la evolución del proyecto
 
