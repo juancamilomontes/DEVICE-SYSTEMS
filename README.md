@@ -96,7 +96,7 @@ Disponible en:
 | DELETE | `/users/{user_id}`      | Eliminar usuario (requiere API Key)| 204 / 404 / 401        |
 
 Todas las respuestas incluyen las cabeceras `X-App-Name: device_systems` y
-`X-API-Version: 1.0`.
+`X-API-Version: 2.0`.
 
 ## Códigos de estado usados
 
@@ -188,7 +188,8 @@ inyectan en las rutas con `Depends()`:
   escribe una sola vez.
 - **`verify_api_key(x_api_key)`** — simula autenticación básica leyendo la
   cabecera `X-API-Key`; protege el endpoint DELETE.
-- **`get_api_settings()`** — expone metadatos/configuración general de la API.
+- **`get_api_settings()`** — expone metadatos/configuración general de la API;
+  se inyecta en el endpoint `GET /info`.
 
 Ejemplo real (la ruta recibe el usuario ya validado por la dependencia):
 

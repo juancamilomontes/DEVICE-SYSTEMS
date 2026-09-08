@@ -19,7 +19,7 @@ def test_listar_usuarios():
     assert r.status_code == 200
     assert isinstance(r.json(), list)
     assert r.headers["X-App-Name"] == "device_systems"
-    assert r.headers["X-API-Version"] == "1.0"
+    assert r.headers["X-API-Version"] == "2.0"
 
 
 def test_filtrar_por_rol():
@@ -124,3 +124,12 @@ def test_delete_sin_api_key():
 
 def test_delete_usuario_inexistente():
     assert client.delete("/users/9999", headers=AUTH).status_code == 404
+
+
+# --- /info (dependencia get_api_settings) -----------------------------------
+def test_info_usa_dependencia():
+    r = client.get("/info")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["app_name"] == "device_systems"
+    assert body["version"] == "2.0.0"
