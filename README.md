@@ -168,10 +168,10 @@ uv run pytest
 ## Capturas
 
 ### Estructura del proyecto
-<!-- ![Estructura del proyecto](images/estructura.png) -->
+![Estructura del proyecto](images/estructura.png)
 
 ### Base de datos generada
-<!-- ![Base de datos device_systems.db](images/base-de-datos.png) -->
+![Base de datos device_systems.db](images/base-de-datos.png)
 
 ### Swagger UI (vista general)
 ![Swagger UI general](images/swagger-general.png)
