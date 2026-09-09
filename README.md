@@ -239,10 +239,6 @@ Postman o Thunder Client.
 ### DELETE /users/{user_id}
 ![DELETE /users](images/DELETE-USER-ID.png)
 
-### ReDoc (/redoc)
-<!-- Pega aquí la captura y descomenta la línea siguiente -->
-<!-- ![ReDoc](images/redoc.png) -->
-
 ### Errores controlados
 
 **422 — datos inválidos**
