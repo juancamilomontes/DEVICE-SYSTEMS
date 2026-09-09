@@ -231,16 +231,16 @@ Postman o Thunder Client.
 ![POST /users](images/post-users.png)
 
 ### PUT /users/{user_id}
-<!-- Pega aquí la captura y descomenta la línea siguiente -->
-<!-- ![PUT /users](images/put-users.png) -->
+![PUT /users](images/PUT-USER-ID.png)
 
 ### PATCH /users/{user_id}
-<!-- ![PATCH /users](images/patch-users.png) -->
+![PATCH /users](images/PATCH-USER-ID.png)
 
 ### DELETE /users/{user_id}
-<!-- ![DELETE /users](images/delete-users.png) -->
+![DELETE /users](images/DELETE-USER-ID.png)
 
 ### ReDoc (/redoc)
+<!-- Pega aquí la captura y descomenta la línea siguiente -->
 <!-- ![ReDoc](images/redoc.png) -->
 
 ### Errores controlados
@@ -249,10 +249,10 @@ Postman o Thunder Client.
 ![Error 422](images/error-422.png)
 
 **400 — PATCH sin datos**
-<!-- ![Error 400 PATCH vacío](images/error-400-patch.png) -->
+![Error 400 PATCH sin cuerpo](images/PATCH-SIN-CUERPO.png)
 
 **401 — DELETE sin API Key**
-<!-- ![Error 401 sin API Key](images/error-401.png) -->
+![Error 401 sin API Key](images/DELETE-ERROR-401.png)
 
 ## Reflexión final sobre la evolución del proyecto
 
