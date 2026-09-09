@@ -1,20 +1,21 @@
-"""Modelos Pydantic v2 para el recurso `users` de device_systems.
+"""Schemas Pydantic v2 para el recurso `users`.
 
-Aquí se definen:
-- El enum de roles permitidos.
-- El modelo base con las validaciones compartidas.
-- El modelo de entrada (lo que envía el cliente al crear un usuario).
-- El modelo de respuesta (lo que la API devuelve, estandarizado).
+Los schemas validan los datos que ENTRAN y SALEN por la API (JSON). Son
+distintos del modelo SQLAlchemy (que define la tabla). Aquí hay 4:
+- UserCreate:  crear (POST)         -> todos los campos.
+- UserUpdate:  reemplazo completo (PUT) -> todos los campos.
+- UserPatch:   actualización parcial (PATCH) -> todos opcionales.
+- UserResponse: lo que devuelve la API -> incluye id y created_at.
 """
 
+from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRole(str, Enum):
-    """Roles permitidos en el sistema. Al heredar de `str`, el valor viaja
-    como texto ("admin", "support", "user") en el JSON y en la URL."""
+    """Roles permitidos. Al heredar de `str`, viaja como texto en el JSON."""
 
     admin = "admin"
     support = "support"
@@ -22,51 +23,44 @@ class UserRole(str, Enum):
 
 
 class UserBase(BaseModel):
-    """Campos comunes con sus validaciones. Los demás modelos heredan de aquí."""
+    """Campos comunes con validaciones. Los reutilizan Create y Update."""
 
-    # name: obligatorio (...) y mínimo 3 caracteres.
-    name: str = Field(..., min_length=3, description="Nombre del usuario, mínimo 3 caracteres")
-    # email: EmailStr valida el formato del correo automáticamente.
-    email: EmailStr = Field(..., description="Correo electrónico válido y único")
-    # role: solo admite los valores del enum; por defecto 'user'.
-    role: UserRole = Field(default=UserRole.user, description="Rol: admin, support o user")
-    # is_active: booleano; por defecto True.
-    is_active: bool = Field(default=True, description="Indica si el usuario está activo")
+    name: str = Field(..., min_length=3, description="Nombre, mínimo 3 caracteres")
+    email: EmailStr = Field(..., description="Correo válido y único")
+    role: UserRole = Field(default=UserRole.user, description="admin, support o user")
+    is_active: bool = Field(default=True, description="Usuario activo o no")
 
 
 class UserCreate(UserBase):
-    """Modelo de ENTRADA para POST /users.
-
-    El cliente NO envía el `id` (lo asigna el servidor), por eso este modelo
-    solo tiene los campos de `UserBase`.
-    """
+    """Entrada para POST /users (crear)."""
 
     pass
 
 
-class UserUpdate(BaseModel):
-    """Modelo de ENTRADA para PATCH /users/{id} (actualización parcial).
+class UserUpdate(UserBase):
+    """Entrada para PUT /users/{id} (reemplazo COMPLETO: todos los campos)."""
 
-    TODOS los campos son opcionales: el cliente envía solo los que quiere
-    cambiar. Los que no envíe quedan "sin definir" (no como None), y con
-    `exclude_unset=True` la ruta sabe exactamente qué se pidió actualizar.
+    pass
+
+
+class UserPatch(BaseModel):
+    """Entrada para PATCH /users/{id} (actualización PARCIAL).
+
+    Todos los campos opcionales: el cliente envía solo lo que quiere cambiar.
     """
 
-    name: str | None = Field(default=None, min_length=3, description="Nuevo nombre (mín. 3 caracteres)")
+    name: str | None = Field(default=None, min_length=3, description="Nuevo nombre (mín. 3)")
     email: EmailStr | None = Field(default=None, description="Nuevo correo válido")
-    role: UserRole | None = Field(default=None, description="Nuevo rol: admin, support o user")
-    is_active: bool | None = Field(default=None, description="Nuevo estado activo/inactivo")
+    role: UserRole | None = Field(default=None, description="Nuevo rol")
+    is_active: bool | None = Field(default=None, description="Nuevo estado")
 
 
 class UserResponse(UserBase):
-    """Modelo de SALIDA (response_model).
+    """Salida de la API (response_model). Incluye los datos que genera la BD."""
 
-    Estandariza lo que la API devuelve e incluye el `id` generado por el
-    servidor. Al declararlo como response_model, FastAPI filtra cualquier
-    campo extra que no esté aquí (así se ocultan datos no necesarios).
-    """
+    id: int = Field(..., description="Identificador único (lo asigna la base de datos)")
+    created_at: datetime | None = Field(default=None, description="Fecha de creación")
 
-    id: int = Field(..., description="Identificador único generado por el servidor")
-
-    # Permite construir el modelo a partir de objetos/atributos, no solo dicts.
+    # from_attributes=True permite crear el schema DIRECTO desde el objeto
+    # SQLAlchemy (leyendo user.id, user.name, ...), no solo desde un dict.
     model_config = ConfigDict(from_attributes=True)

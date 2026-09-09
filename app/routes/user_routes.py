@@ -1,19 +1,19 @@
-"""Rutas (endpoints) del recurso `users`.
+"""Rutas (endpoints) del recurso `users` — ahora sobre base de datos.
 
-Las rutas son "delgadas": validan/reciben datos, delegan la lógica en la capa
-de servicios y usan dependencias (`Depends`) para lo reutilizable. No conocen
-cómo se guardan los usuarios.
+Las rutas reciben la sesión de BD con Depends(get_db), delegan la lógica en el
+servicio y usan get_user_or_404 para el chequeo de existencia.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from typing import Literal
 
-from app.dependencies.user_dependencies import (
-    get_user_or_404,
-    get_user_service,
-    verify_api_key,
-)
-from app.schemas.user_schema import UserCreate, UserResponse, UserRole, UserUpdate
-from app.services.user_service import UserService
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+
+from app.dependencies.database_dependency import get_db
+from app.dependencies.user_dependencies import get_user_or_404, verify_api_key
+from app.models.user_model import User
+from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserRole, UserUpdate
+from app.services import user_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -23,15 +23,21 @@ router = APIRouter(prefix="/users", tags=["Users"])
     "",
     response_model=list[UserResponse],
     summary="Listar usuarios",
-    response_description="Lista de usuarios (opcionalmente filtrada)",
+    response_description="Lista de usuarios (filtrada y ordenada)",
 )
 def listar_usuarios(
     role: UserRole | None = Query(default=None, description="Filtra por rol"),
     is_active: bool | None = Query(default=None, description="Filtra por estado activo"),
-    service: UserService = Depends(get_user_service),
+    order_by: Literal["name", "created_at"] = Query(default="name", description="Ordenar por"),
+    db: Session = Depends(get_db),
 ):
-    """Lista todos los usuarios. Admite filtros `?role=` y `?is_active=`."""
-    return service.list_users(role.value if role else None, is_active)
+    """Lista usuarios. Admite `?role=`, `?is_active=` y `?order_by=`."""
+    return user_service.get_users(
+        db,
+        role=role.value if role else None,
+        is_active=is_active,
+        order_by=order_by,
+    )
 
 
 # --- GET /users/{user_id} ---------------------------------------------------
@@ -41,8 +47,8 @@ def listar_usuarios(
     summary="Consultar usuario por ID",
     response_description="Datos del usuario solicitado",
 )
-def obtener_usuario(user: dict = Depends(get_user_or_404)):
-    """Consulta un usuario por su id. Devuelve 404 si no existe."""
+def obtener_usuario(user: User = Depends(get_user_or_404)):
+    """Consulta un usuario por su id. 404 si no existe."""
     return user
 
 
@@ -54,17 +60,14 @@ def obtener_usuario(user: dict = Depends(get_user_or_404)):
     summary="Crear usuario",
     response_description="Usuario creado",
 )
-def crear_usuario(
-    datos: UserCreate,
-    service: UserService = Depends(get_user_service),
-):
-    """Registra un nuevo usuario. Rechaza correos duplicados con 400."""
-    if service.email_exists(datos.email):
+def crear_usuario(datos: UserCreate, db: Session = Depends(get_db)):
+    """Crea un usuario. Rechaza correos duplicados con 400."""
+    if user_service.get_user_by_email(db, datos.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"El correo {datos.email} ya está registrado",
         )
-    return service.create_user(datos)
+    return user_service.create_user(db, datos)
 
 
 # --- PUT /users/{user_id} ---------------------------------------------------
@@ -75,21 +78,18 @@ def crear_usuario(
     response_description="Usuario reemplazado por completo",
 )
 def reemplazar_usuario(
-    datos: UserCreate,
-    user: dict = Depends(get_user_or_404),
-    service: UserService = Depends(get_user_service),
+    datos: UserUpdate,
+    user: User = Depends(get_user_or_404),
+    db: Session = Depends(get_db),
 ):
-    """Reemplaza TODOS los campos de un usuario existente.
-
-    Requiere enviar name, email, role e is_active. Devuelve 404 si no existe
-    y 400 si el nuevo correo ya lo usa otro usuario.
-    """
-    if service.email_exists(datos.email, exclude_id=user["id"]):
+    """Reemplaza TODOS los campos. 404 si no existe, 400 si el correo ya lo usa otro."""
+    existente = user_service.get_user_by_email(db, datos.email)
+    if existente and existente.id != user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"El correo {datos.email} ya está registrado por otro usuario",
         )
-    return service.replace_user(user, datos)
+    return user_service.update_user(db, user, datos)
 
 
 # --- PATCH /users/{user_id} -------------------------------------------------
@@ -100,28 +100,25 @@ def reemplazar_usuario(
     response_description="Usuario actualizado parcialmente",
 )
 def actualizar_usuario_parcial(
-    datos: UserUpdate,
-    user: dict = Depends(get_user_or_404),
-    service: UserService = Depends(get_user_service),
+    datos: UserPatch,
+    user: User = Depends(get_user_or_404),
+    db: Session = Depends(get_db),
 ):
-    """Actualiza solo los campos enviados.
-
-    Si no se envía ningún campo, responde 400. 404 si el usuario no existe y
-    400 si el nuevo correo ya lo usa otro usuario.
-    """
-    # exclude_unset=True => solo lo que el cliente envió realmente.
+    """Actualiza solo lo enviado. PATCH vacío -> 400. 404 si no existe."""
     cambios = datos.model_dump(mode="json", exclude_unset=True)
     if not cambios:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Debe enviar al menos un campo para actualizar",
         )
-    if "email" in cambios and service.email_exists(cambios["email"], exclude_id=user["id"]):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El correo {cambios['email']} ya está registrado por otro usuario",
-        )
-    return service.apply_changes(user, cambios)
+    if "email" in cambios:
+        existente = user_service.get_user_by_email(db, cambios["email"])
+        if existente and existente.id != user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"El correo {cambios['email']} ya está registrado por otro usuario",
+            )
+    return user_service.patch_user(db, user, cambios)
 
 
 # --- DELETE /users/{user_id} ------------------------------------------------
@@ -133,12 +130,8 @@ def actualizar_usuario_parcial(
     dependencies=[Depends(verify_api_key)],
 )
 def eliminar_usuario(
-    user: dict = Depends(get_user_or_404),
-    service: UserService = Depends(get_user_service),
+    user: User = Depends(get_user_or_404),
+    db: Session = Depends(get_db),
 ):
-    """Elimina un usuario existente. Devuelve 204 sin cuerpo.
-
-    Requiere la cabecera `X-API-Key: device-systems-2026` (auth simulada).
-    404 si el usuario no existe.
-    """
-    service.delete_user(user)
+    """Elimina un usuario. 204 sin cuerpo. Requiere cabecera X-API-Key. 404 si no existe."""
+    user_service.delete_user(db, user)

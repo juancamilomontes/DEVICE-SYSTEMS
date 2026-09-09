@@ -1,38 +1,61 @@
-"""Punto de entrada de la API device_systems (versión 2.0).
+"""Punto de entrada de la API device_systems (versión 3.0 — con persistencia).
 
-Crea la aplicación FastAPI con metadatos completos para la documentación
-automática (Swagger/OpenAPI y ReDoc), registra el router de usuarios y agrega
-un middleware con cabeceras HTTP personalizadas.
+Crea la aplicación FastAPI, crea las tablas en la base de datos al arrancar,
+sirve la documentación (Swagger/ReDoc) y agrega cabeceras HTTP personalizadas.
 """
 
 from fastapi import Depends, FastAPI, Request
 
+from app.database.connection import Base, SessionLocal, engine
 from app.dependencies.user_dependencies import get_api_settings
+from app.models.user_model import User  # importa el modelo para que create_all lo conozca
 from app.routes import user_routes
 
-# Descripción larga (se muestra en la portada de Swagger UI / ReDoc).
+# Crea las tablas en la base de datos si no existen (usa los modelos que heredan
+# de Base). Con SQLite, esto genera el archivo device_systems.db al arrancar.
+Base.metadata.create_all(bind=engine)
+
+
+def _sembrar_datos_iniciales() -> None:
+    """Inserta 3 usuarios de ejemplo SOLO si la tabla está vacía.
+
+    Sirve para que los GET muestren datos la primera vez. Como es persistente,
+    en los siguientes arranques ya hay datos y no se vuelve a sembrar.
+    """
+    db = SessionLocal()
+    try:
+        if db.query(User).count() == 0:
+            db.add_all([
+                User(name="Juan Camilo Montes", email="juanca@device.com", role="admin", is_active=True),
+                User(name="Ana Soporte", email="ana@device.com", role="support", is_active=True),
+                User(name="Pedro Perez", email="pedro@device.com", role="user", is_active=False),
+            ])
+            db.commit()
+    finally:
+        db.close()
+
+
+_sembrar_datos_iniciales()
+
+
 description = """
 API REST para la gestión de **usuarios** del sistema **device_systems**.
 
-Incluye el **CRUD completo** del recurso `/users`:
-
-* Crear, listar, consultar por id y filtrar (rol / estado).
-* Actualización completa (**PUT**) y parcial (**PATCH**).
-* Eliminación (**DELETE**) protegida con cabecera de API Key.
-* Manejo de errores con códigos HTTP apropiados.
-* Lógica reutilizable mediante **Dependency Injection** (`Depends()`).
+Versión 3.0: los usuarios se **persisten en una base de datos** (SQLite) mediante
+**SQLAlchemy**. Incluye el CRUD completo del recurso `/users` con validaciones,
+constraints, manejo de errores, documentación Swagger/OpenAPI e inyección de
+dependencias (`Depends()`).
 """
 
-# Metadatos de los tags: agrupan y describen los endpoints en la documentación.
 tags_metadata = [
-    {"name": "Users", "description": "Operaciones CRUD sobre el recurso usuarios."},
-    {"name": "root", "description": "Endpoints de bienvenida y estado de la API."},
+    {"name": "Users", "description": "Operaciones CRUD sobre el recurso usuarios (en base de datos)."},
+    {"name": "root", "description": "Endpoints de bienvenida, estado e información de la API."},
 ]
 
 app = FastAPI(
     title="device_systems API",
     description=description,
-    version="2.0.0",
+    version="3.0.0",
     contact={"name": "Juan Camilo Montes", "email": "jm3876602@gmail.com"},
     openapi_tags=tags_metadata,
 )
@@ -43,15 +66,14 @@ app = FastAPI(
 async def agregar_cabeceras_personalizadas(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "2.0"
+    response.headers["X-API-Version"] = "3.0"
     return response
 
 
-# Registra todas las rutas de /users.
 app.include_router(user_routes.router)
 
 
-# --- Endpoints de bienvenida / salud ----------------------------------------
+# --- Endpoints de bienvenida / salud / info ---------------------------------
 @app.get("/", tags=["root"], summary="Mensaje de bienvenida")
 def read_root():
     return {"message": "Bienvenido a la API de device_systems!"}
@@ -67,9 +89,5 @@ def read_estado():
 
 @app.get("/info", tags=["root"], summary="Información/configuración de la API")
 def read_info(settings: dict = Depends(get_api_settings)):
-    """Devuelve la configuración general de la API.
-
-    Los datos los provee la dependencia `get_api_settings` mediante Depends(),
-    demostrando la inyección de configuración reutilizable.
-    """
+    """Devuelve la configuración general de la API (inyectada con Depends)."""
     return settings
