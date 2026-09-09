@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Base de datos local de SQLite (no se versiona: cada quien genera la suya)
+*.db
