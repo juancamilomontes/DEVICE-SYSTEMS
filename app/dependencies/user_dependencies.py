@@ -34,7 +34,7 @@ def get_api_settings() -> dict:
     """Configuración general de la API (metadatos que se pueden inyectar)."""
     return {
         "app_name": "device_systems",
-        "version": "3.0.0",
+        "version": "4.0.0",
         "author": "Juan Camilo Montes",
     }
 

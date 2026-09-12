@@ -1,61 +1,34 @@
-"""Punto de entrada de la API device_systems (versión 3.0 — con persistencia).
+"""Punto de entrada de la API device_systems (v4.0 — relaciones y migraciones).
 
-Crea la aplicación FastAPI, crea las tablas en la base de datos al arrancar,
-sirve la documentación (Swagger/ReDoc) y agrega cabeceras HTTP personalizadas.
+Ahora el esquema de la base de datos lo gestiona **Alembic** (migraciones), por
+eso este archivo ya NO crea tablas: primero corres `alembic upgrade head` y
+luego arrancas el servidor.
 """
 
 from fastapi import Depends, FastAPI, Request
 
-from app.database.connection import Base, SessionLocal, engine
 from app.dependencies.user_dependencies import get_api_settings
-from app.models.user_model import User  # importa el modelo para que create_all lo conozca
-from app.routes import user_routes
-
-# Crea las tablas en la base de datos si no existen (usa los modelos que heredan
-# de Base). Con SQLite, esto genera el archivo device_systems.db al arrancar.
-Base.metadata.create_all(bind=engine)
-
-
-def _sembrar_datos_iniciales() -> None:
-    """Inserta 3 usuarios de ejemplo SOLO si la tabla está vacía.
-
-    Sirve para que los GET muestren datos la primera vez. Como es persistente,
-    en los siguientes arranques ya hay datos y no se vuelve a sembrar.
-    """
-    db = SessionLocal()
-    try:
-        if db.query(User).count() == 0:
-            db.add_all([
-                User(name="Juan Camilo Montes", email="juanca@device.com", role="admin", is_active=True),
-                User(name="Ana Soporte", email="ana@device.com", role="support", is_active=True),
-                User(name="Pedro Perez", email="pedro@device.com", role="user", is_active=False),
-            ])
-            db.commit()
-    finally:
-        db.close()
-
-
-_sembrar_datos_iniciales()
-
+from app.routes import device_routes, loan_routes, user_routes
 
 description = """
-API REST para la gestión de **usuarios** del sistema **device_systems**.
+API REST del sistema **device_systems** para gestionar **usuarios**, **dispositivos**
+y **préstamos**.
 
-Versión 3.0: los usuarios se **persisten en una base de datos** (SQLite) mediante
-**SQLAlchemy**. Incluye el CRUD completo del recurso `/users` con validaciones,
-constraints, manejo de errores, documentación Swagger/OpenAPI e inyección de
-dependencias (`Depends()`).
+Versión 4.0: incorpora **migraciones con Alembic**, **relaciones entre modelos**
+(User ↔ Loan ↔ Device) y **consultas con joins y filtros avanzados**.
 """
 
 tags_metadata = [
-    {"name": "Users", "description": "Operaciones CRUD sobre el recurso usuarios (en base de datos)."},
-    {"name": "root", "description": "Endpoints de bienvenida, estado e información de la API."},
+    {"name": "Users", "description": "Gestión de usuarios y sus préstamos."},
+    {"name": "Devices", "description": "Gestión de dispositivos e historial de préstamos."},
+    {"name": "Loans", "description": "Préstamos: crear, devolver y consultar con datos relacionados."},
+    {"name": "root", "description": "Bienvenida, estado e información de la API."},
 ]
 
 app = FastAPI(
     title="device_systems API",
     description=description,
-    version="3.0.0",
+    version="4.0.0",
     contact={"name": "Juan Camilo Montes", "email": "jm3876602@gmail.com"},
     openapi_tags=tags_metadata,
 )
@@ -66,11 +39,14 @@ app = FastAPI(
 async def agregar_cabeceras_personalizadas(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-App-Name"] = "device_systems"
-    response.headers["X-API-Version"] = "3.0"
+    response.headers["X-API-Version"] = "4.0"
     return response
 
 
+# Registra los tres recursos.
 app.include_router(user_routes.router)
+app.include_router(device_routes.router)
+app.include_router(loan_routes.router)
 
 
 # --- Endpoints de bienvenida / salud / info ---------------------------------
@@ -81,10 +57,7 @@ def read_root():
 
 @app.get("/estado", tags=["root"], summary="Estado de la aplicación")
 def read_estado():
-    return {
-        "Estado": "La aplicación está funcionando correctamente.",
-        "server": "FastAPI",
-    }
+    return {"Estado": "La aplicación está funcionando correctamente.", "server": "FastAPI"}
 
 
 @app.get("/info", tags=["root"], summary="Información/configuración de la API")
