@@ -12,8 +12,9 @@ from sqlalchemy.orm import Session
 from app.dependencies.database_dependency import get_db
 from app.dependencies.user_dependencies import get_user_or_404, verify_api_key
 from app.models.user_model import User
+from app.schemas.loan_schema import LoanDetailResponse
 from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserRole, UserUpdate
-from app.services import user_service
+from app.services import loan_service, user_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -50,6 +51,29 @@ def listar_usuarios(
 def obtener_usuario(user: User = Depends(get_user_or_404)):
     """Consulta un usuario por su id. 404 si no existe."""
     return user
+
+
+# --- GET /users/{user_id}/loans ---------------------------------------------
+@router.get(
+    "/{user_id}/loans",
+    response_model=list[LoanDetailResponse],
+    summary="Préstamos de un usuario",
+    response_description="Dispositivos prestados al usuario (con joins)",
+)
+def prestamos_del_usuario(user: User = Depends(get_user_or_404), db: Session = Depends(get_db)):
+    """Lista los préstamos de un usuario con la info del dispositivo (join)."""
+    prestamos = loan_service.get_user_loans(db, user.id)
+    return [
+        {
+            "loan_id": p.id,
+            "status": p.status,
+            "loan_date": p.loan_date,
+            "return_date": p.return_date,
+            "user": p.user,
+            "device": p.device,
+        }
+        for p in prestamos
+    ]
 
 
 # --- POST /users ------------------------------------------------------------

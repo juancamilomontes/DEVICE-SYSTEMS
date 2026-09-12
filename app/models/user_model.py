@@ -10,6 +10,7 @@ OJO: esto NO es lo mismo que el schema Pydantic.
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
 
@@ -37,3 +38,7 @@ class User(Base):
 
     # Fecha de creación: se rellena sola con la hora actual (UTC) al insertar.
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # Relación 1-a-muchos: un usuario puede tener MUCHOS préstamos.
+    # back_populates enlaza con Loan.user (los dos lados quedan sincronizados).
+    loans = relationship("Loan", back_populates="user")
