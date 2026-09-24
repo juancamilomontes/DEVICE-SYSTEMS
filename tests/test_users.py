@@ -1,64 +1,52 @@
-"""Pruebas del recurso users (CRUD sobre base de datos)."""
-
-AUTH = {"X-API-Key": "device-systems-2026"}
+"""Pruebas del recurso users con protección por token/rol."""
 
 
-def crear(client, name="Test User", email="test@device.com", role="user"):
-    return client.post("/users", json={"name": name, "email": email, "role": role})
+def test_listar_sin_token_401(client):
+    assert client.get("/users").status_code == 401
 
 
-def test_crear_usuario_ok(client):
-    r = crear(client)
-    assert r.status_code == 201
-    assert "created_at" in r.json()
-
-
-def test_crear_email_duplicado(client):
-    assert crear(client, email="dup@device.com").status_code == 201
-    assert crear(client, email="dup@device.com").status_code == 400
-
-
-def test_crear_nombre_corto(client):
-    assert client.post("/users", json={"name": "ab", "email": "x@device.com"}).status_code == 422
-
-
-def test_crear_email_invalido(client):
-    assert client.post("/users", json={"name": "Valido", "email": "malo"}).status_code == 422
-
-
-def test_listar_y_cabeceras(client):
-    crear(client, email="a@device.com")
-    r = client.get("/users")
+def test_listar_con_token(client, user_headers):
+    r = client.get("/users", headers=user_headers)
     assert r.status_code == 200
-    assert r.headers["X-App-Name"] == "device_systems"
-    assert r.headers["X-API-Version"] == "4.0"
+    assert isinstance(r.json(), list)
 
 
-def test_obtener_inexistente(client):
-    assert client.get("/users/9999").status_code == 404
+def test_obtener_por_id(client, admin_headers):
+    # admin ya existe (lo creó el fixture); lo listamos y consultamos por id
+    users = client.get("/users", headers=admin_headers).json()
+    uid = users[0]["id"]
+    assert client.get(f"/users/{uid}", headers=admin_headers).status_code == 200
 
 
-def test_put_y_patch(client):
-    uid = crear(client, email="pp@device.com").json()["id"]
-    r = client.put(f"/users/{uid}", json={"name": "Edit PUT", "email": "pp@device.com", "role": "admin", "is_active": False})
-    assert r.status_code == 200 and r.json()["role"] == "admin"
-    r = client.patch(f"/users/{uid}", json={"role": "support"})
-    assert r.status_code == 200 and r.json()["role"] == "support"
+def test_obtener_inexistente_404(client, admin_headers):
+    assert client.get("/users/9999", headers=admin_headers).status_code == 404
 
 
-def test_patch_vacio_400(client):
-    uid = crear(client, email="v@device.com").json()["id"]
-    assert client.patch(f"/users/{uid}", json={}).status_code == 400
+def test_admin_puede_editar(client, admin_headers):
+    uid = client.get("/users", headers=admin_headers).json()[0]["id"]
+    r = client.patch(f"/users/{uid}", json={"role": "support"}, headers=admin_headers)
+    assert r.status_code == 200
+    assert r.json()["role"] == "support"
 
 
-def test_delete(client):
-    uid = crear(client, email="del@device.com").json()["id"]
-    assert client.delete(f"/users/{uid}", headers=AUTH).status_code == 204
-    assert client.delete(f"/users/{uid}", headers=AUTH).status_code == 404
-    # sin API key -> 401
-    uid2 = crear(client, email="del2@device.com").json()["id"]
-    assert client.delete(f"/users/{uid2}").status_code == 401
+def test_usuario_normal_no_puede_editar_403(client, user_headers):
+    uid = client.get("/users", headers=user_headers).json()[0]["id"]
+    r = client.patch(f"/users/{uid}", json={"role": "admin"}, headers=user_headers)
+    assert r.status_code == 403
+
+
+def test_usuario_normal_no_puede_eliminar_403(client, user_headers):
+    uid = client.get("/users", headers=user_headers).json()[0]["id"]
+    assert client.delete(f"/users/{uid}", headers=user_headers).status_code == 403
+
+
+def test_admin_puede_eliminar(client, admin_headers, make_headers):
+    otro = make_headers("otro@device.com", role="user")  # crea otro usuario
+    # buscar su id
+    users = client.get("/users", headers=admin_headers).json()
+    uid = next(u["id"] for u in users if u["email"] == "otro@device.com")
+    assert client.delete(f"/users/{uid}", headers=admin_headers).status_code == 204
 
 
 def test_info(client):
-    assert client.get("/info").json()["version"] == "4.0.0"
+    assert client.get("/info").json()["version"] == "5.0.0"

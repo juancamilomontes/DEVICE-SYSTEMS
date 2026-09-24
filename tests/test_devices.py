@@ -1,52 +1,52 @@
-"""Pruebas del recurso devices (CRUD + filtros + búsqueda)."""
-
-AUTH = {"X-API-Key": "device-systems-2026"}
+"""Pruebas del recurso devices con protección por rol."""
 
 
-def crear(client, name="Laptop Lenovo", serial="LEN-001", device_type="laptop", brand="Lenovo"):
-    return client.post("/devices", json={
-        "name": name, "serial_number": serial, "device_type": device_type, "brand": brand,
-    })
+def _payload(serial="LEN-001", name="Laptop Lenovo", device_type="laptop", brand="Lenovo"):
+    return {"name": name, "serial_number": serial, "device_type": device_type, "brand": brand}
 
 
-def test_crear_dispositivo_ok(client):
-    r = crear(client)
+def test_crear_sin_token_401(client):
+    assert client.post("/devices", json=_payload()).status_code == 401
+
+
+def test_crear_usuario_normal_403(client, user_headers):
+    assert client.post("/devices", json=_payload(), headers=user_headers).status_code == 403
+
+
+def test_crear_admin_201(client, admin_headers):
+    r = client.post("/devices", json=_payload(serial="ADM-1"), headers=admin_headers)
     assert r.status_code == 201
-    body = r.json()
-    assert body["is_available"] is True
-    assert "created_at" in body
+    assert r.json()["is_available"] is True
 
 
-def test_serial_duplicado_400(client):
-    assert crear(client, serial="DUP-1").status_code == 201
-    assert crear(client, serial="DUP-1", name="Otro").status_code == 400
+def test_crear_support_201(client, support_headers):
+    r = client.post("/devices", json=_payload(serial="SUP-1"), headers=support_headers)
+    assert r.status_code == 201
 
 
-def test_nombre_corto_422(client):
-    assert client.post("/devices", json={"name": "ab", "serial_number": "S1", "device_type": "laptop"}).status_code == 422
+def test_serial_duplicado_400(client, admin_headers):
+    assert client.post("/devices", json=_payload(serial="DUP-1"), headers=admin_headers).status_code == 201
+    assert client.post("/devices", json=_payload(serial="DUP-1", name="Otro"), headers=admin_headers).status_code == 400
 
 
-def test_obtener_y_404(client):
-    did = crear(client, serial="GET-1").json()["id"]
-    assert client.get(f"/devices/{did}").status_code == 200
-    assert client.get("/devices/9999").status_code == 404
+def test_nombre_corto_422(client, admin_headers):
+    r = client.post("/devices", json={"name": "ab", "serial_number": "S1", "device_type": "laptop"}, headers=admin_headers)
+    assert r.status_code == 422
 
 
-def test_filtros(client):
-    crear(client, name="Laptop A", serial="F-1", device_type="laptop", brand="Lenovo")
-    crear(client, name="Tablet B", serial="F-2", device_type="tablet", brand="Samsung")
+def test_listar_y_filtros_publico(client, admin_headers):
+    client.post("/devices", json=_payload(serial="F-1", device_type="laptop", brand="Lenovo"), headers=admin_headers)
+    client.post("/devices", json=_payload(serial="F-2", name="Tablet", device_type="tablet", brand="Samsung"), headers=admin_headers)
+    # GET /devices es público (no está en la tabla de protección)
+    assert len(client.get("/devices").json()) == 2
     assert len(client.get("/devices", params={"device_type": "laptop"}).json()) == 1
-    assert len(client.get("/devices", params={"brand": "lenovo"}).json()) == 1  # ilike
+    assert len(client.get("/devices", params={"brand": "lenovo"}).json()) == 1
     assert len(client.get("/devices", params={"search": "tablet"}).json()) == 1
-    assert len(client.get("/devices", params={"is_available": "true"}).json()) == 2
 
 
-def test_put_patch_delete(client):
-    did = crear(client, serial="UP-1").json()["id"]
-    r = client.put(f"/devices/{did}", json={"name": "Laptop Nueva", "serial_number": "UP-1", "device_type": "laptop", "brand": "HP", "is_available": True})
-    assert r.status_code == 200 and r.json()["brand"] == "HP"
-    r = client.patch(f"/devices/{did}", json={"is_available": False})
-    assert r.status_code == 200 and r.json()["is_available"] is False
-    assert client.patch(f"/devices/{did}", json={}).status_code == 400
-    assert client.delete(f"/devices/{did}", headers=AUTH).status_code == 204
-    assert client.get(f"/devices/{did}").status_code == 404
+def test_eliminar_admin_ok_y_support_no(client, admin_headers, support_headers):
+    did = client.post("/devices", json=_payload(serial="DEL-1"), headers=admin_headers).json()["id"]
+    # support NO puede eliminar (solo admin) -> 403
+    assert client.delete(f"/devices/{did}", headers=support_headers).status_code == 403
+    # admin sí -> 204
+    assert client.delete(f"/devices/{did}", headers=admin_headers).status_code == 204

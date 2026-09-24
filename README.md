@@ -1,155 +1,162 @@
-# device_systems — API REST (v4.0 · Alembic, Relaciones y Joins)
+# device_systems — API REST (v5.0 · Seguridad)
 
-**Actividad:** GA1-220501096-01-AA1-EV10 — FastAPI Avanzado (Proyecto Final v1)
+**Actividad:** GA1-220501096-01-AA1-EV11 — FastAPI Seguridad (Proyecto Final v2)
 **Autor:** Juan Camilo Montes
 **Programa:** Análisis y Desarrollo de Software (ADSO) — SENA
-**Rama de la entrega:** `device_systems_alembic_relaciones`
+**Rama de la entrega:** `device_systems_security`
 
 ## Descripción
 
-`device_systems` evoluciona de un CRUD de una sola tabla a un **sistema con relaciones**:
-gestiona **usuarios**, **dispositivos** y **préstamos**. Incorpora **migraciones de
-base de datos con Alembic**, **asociaciones entre modelos** (`ForeignKey` +
-`relationship`) y **consultas con joins y filtros avanzados**.
+`device_systems` incorpora una **capa de seguridad profesional** sobre el sistema
+de usuarios, dispositivos y préstamos: **autenticación OAuth2 con JWT**, contraseñas
+con **hash (passlib/bcrypt)**, **rutas protegidas por rol**, **CORS**, **middleware**
+de trazabilidad y **rate limiting**.
 
-- Un **usuario** puede tener muchos **préstamos** (One-to-Many).
-- Un **dispositivo** puede aparecer en muchos préstamos históricos (One-to-Many).
-- Cada **préstamo** pertenece a un usuario y a un dispositivo (Many-to-One).
+## Tecnologías
 
-## Tecnologías utilizadas
-
-Python 3.11+ · **FastAPI** · **SQLAlchemy 2.0** · **Alembic** (migraciones) ·
-**SQLite** · Uvicorn · Pydantic v2 · pytest · gestor **uv**.
+Python 3.11+ · FastAPI · SQLAlchemy 2.0 · Alembic · SQLite · Pydantic v2 ·
+**python-jose** (JWT) · **passlib[bcrypt]** (hash) · **slowapi** (rate limiting) ·
+python-multipart · python-dotenv · Uvicorn · pytest · gestor **uv**.
 
 ## Estructura del proyecto
 
 ```
 device_systems/
 ├── alembic/
-│   ├── versions/            # migraciones generadas
-│   └── env.py               # configurado con la metadata de los modelos
-├── alembic.ini              # URL de la BD y configuración de Alembic
+│   ├── versions/            # migraciones (crear tablas + add auth fields)
+│   └── env.py
+├── alembic.ini
 ├── app/
-│   ├── main.py              # crea la app y registra los 3 recursos
+│   ├── main.py              # CORS, middleware, rate limiting, routers
+│   ├── auth/
+│   │   ├── auth_routes.py   # /auth/register, /auth/login, /auth/me
+│   │   ├── auth_service.py  # registrar / autenticar
+│   │   └── security.py      # hash y JWT
 │   ├── database/connection.py
-│   ├── models/              # user_model.py, device_model.py, loan_model.py
-│   ├── schemas/             # user_schema.py, device_schema.py, loan_schema.py
-│   ├── routes/              # user_routes.py, device_routes.py, loan_routes.py
-│   ├── services/            # user_service.py, device_service.py, loan_service.py
-│   └── dependencies/        # database_dependency.py, user_dependencies.py
+│   ├── models/              # user_model, device_model, loan_model
+│   ├── schemas/             # user_, device_, loan_, auth_schema
+│   ├── routes/              # user_, device_, loan_routes
+│   ├── services/            # user_, device_, loan_service
+│   ├── dependencies/
+│   │   ├── database_dependency.py   # get_db
+│   │   └── auth_dependency.py       # get_current_user, require_admin, ...
+│   └── middlewares/
+│       ├── request_middleware.py    # trazabilidad (X-Process-Time, ...)
+│       └── rate_limit.py            # limiter (slowapi)
+├── .env / .env.example
 ├── requirements.txt
 └── README.md
 ```
 
-## Modelos y relaciones
-
-| Modelo | Tabla | Campos clave | Relación |
-|--------|-------|--------------|----------|
-| `User` | users | id, name, email (único), role, is_active, created_at | `loans` → muchos préstamos |
-| `Device` | devices | id, name, serial_number (único), device_type, brand, is_available, created_at | `loans` → muchos préstamos |
-| `Loan` | loans | id, **user_id** (FK), **device_id** (FK), loan_date, return_date, status | `user`, `device` |
-
-Las relaciones se definen con `relationship()` + `back_populates`, y las `ForeignKey`
-garantizan la **integridad referencial** (un préstamo siempre apunta a un usuario y a
-un dispositivo que existen).
-
-## Instalación
+## Instalación y configuración
 
 ```bash
-uv sync          # o:  pip install -r requirements.txt
+uv sync            # o: pip install -r requirements.txt
 ```
 
-## Migraciones con Alembic
-
-El esquema de la base de datos lo gestiona **Alembic** (no se crea a mano). Comandos:
+Copia `.env.example` como `.env` y define tu `SECRET_KEY` (clave para firmar los JWT):
 
 ```bash
-# 1) inicializar Alembic (ya hecho, genera alembic/ y alembic.ini)
-alembic init alembic
-
-# 2) generar una migración a partir de los modelos
-alembic revision --autogenerate -m "create users, devices and loans tables"
-
-# 3) aplicar las migraciones (crea las tablas / el archivo device_systems.db)
-alembic upgrade head
-
-# 4) ver el historial de migraciones
-alembic history
+cp .env.example .env
 ```
 
-> Con `uv`, antepón `uv run` a cada comando (ej.: `uv run alembic upgrade head`).
-> **Primero migra, luego arranca el servidor.**
+## Migraciones (Alembic)
 
-## Ejecución del servidor
+El campo `hashed_password` se agrega mediante una migración:
+
+```bash
+uv run alembic upgrade head          # aplica todas las migraciones
+uv run alembic history               # 1) crear tablas  2) add authentication fields to users
+```
+
+> El proyecto ya trae dos migraciones: la inicial (users/devices/loans) y
+> `add authentication fields to users` (agrega `hashed_password`).
+
+## Ejecución
 
 ```bash
 uv run uvicorn app.main:app --reload
 ```
 
-Documentación: **Swagger** en `/docs` · **ReDoc** en `/redoc`.
+Swagger: `/docs` (con botón **Authorize** OAuth2) · ReDoc: `/redoc`.
 
-## Endpoints
+## Autenticación (OAuth2 + JWT)
 
-### Users
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| GET/POST | `/users` | Listar (filtros) / crear |
-| GET/PUT/PATCH/DELETE | `/users/{id}` | Consultar / actualizar / eliminar |
-| GET | `/users/{id}/loans` | Préstamos del usuario (join) |
+| POST | `/auth/register` | Crea un usuario con contraseña segura (hasheada) |
+| POST | `/auth/login` | Devuelve `{access_token, token_type}` |
+| GET | `/auth/me` | Datos del usuario autenticado (nunca la contraseña) |
 
-### Devices
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET/POST | `/devices` | Listar (`?device_type=` `?is_available=` `?brand=` `?search=`) / crear |
-| GET/PUT/PATCH/DELETE | `/devices/{id}` | Consultar / actualizar / eliminar |
-| GET | `/devices/{id}/loans` | Historial de préstamos del dispositivo (join) |
+**Reglas de contraseña** (validadas con Pydantic v2 `field_validator`): mínimo 8
+caracteres, al menos una mayúscula, una minúscula, un número y sin espacios.
 
-### Loans
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| GET | `/loans` | Listar (`?status=` `?user_email=` `?device_type=`) |
-| GET | `/loans/details` | Listar con datos de usuario y dispositivo (join) |
-| GET | `/loans/{id}` | Consultar un préstamo (con detalle) |
-| POST | `/loans` | Registrar préstamo |
-| PATCH | `/loans/{id}/return` | Devolver dispositivo |
+La contraseña **nunca** se guarda ni se devuelve en texto plano: solo se almacena
+su hash bcrypt (`hashed_password`), que jamás aparece en los response models.
 
-## Reglas de negocio de los préstamos
+Para usar rutas protegidas: `Authorization: Bearer <access_token>`.
 
-**POST /loans**: valida que el usuario exista (404), que el dispositivo exista (404)
-y que esté disponible (409); crea el préstamo y pone el dispositivo en
-`is_available = False`.
+## Protección de rutas (roles)
 
-**PATCH /loans/{id}/return**: valida que el préstamo exista (404) y que no esté ya
-devuelto (409); marca `returned`, asigna `return_date` y pone el dispositivo en
-`is_available = True`.
+| Ruta | Protección |
+|------|------------|
+| `GET /users`, `GET /users/{id}` | Usuario autenticado |
+| `PUT/PATCH/DELETE /users/{id}` | Admin |
+| `POST /devices`, `PUT /devices/{id}` | Admin o support |
+| `DELETE /devices/{id}` | Admin |
+| `POST /loans` | Usuario autenticado |
+| `PATCH /loans/{id}/return` | Admin o support |
+| `GET /loans/details` | Admin o support |
 
-## Consultas con joins y filtros
+- Sin token o token inválido → **401 Unauthorized**.
+- Autenticado pero sin el rol requerido → **403 Forbidden**.
 
-`GET /loans/details` combina las tres tablas y devuelve la información relacionada:
+## CORS
 
-```json
-{
-  "loan_id": 1,
-  "status": "active",
-  "user":   { "id": 1, "name": "Ana Pérez", "email": "ana@sena.edu.co" },
-  "device": { "id": 3, "name": "Laptop Lenovo ThinkPad", "serial_number": "LEN-2024-001", "device_type": "laptop" }
-}
+Configurado en `main.py` para el frontend local:
+
+```python
+allow_origins=["http://localhost:5173", "http://localhost:3000"]
+allow_credentials=True
+allow_methods=["*"]
+allow_headers=["*"]
 ```
 
-Internamente se usan `join()`, `where()`/`filter()`, `ilike()` (búsqueda sin
-distinguir mayúsculas) y `or_()` (búsqueda en varios campos).
+**¿Por qué no usar `"*"` en producción cuando hay credenciales?** Porque el
+estándar CORS **prohíbe** combinar `allow_origins=["*"]` con
+`allow_credentials=True`: el navegador rechaza la respuesta. Además, un comodín
+permitiría que **cualquier sitio** haga peticiones con las cookies/token del
+usuario (riesgo de CSRF y robo de sesión). En producción se debe listar
+explícitamente cada dominio de confianza.
+
+## Middleware de trazabilidad
+
+Cada respuesta incluye:
+
+```
+X-App-Name: device_systems
+X-Process-Time: 0.0042      # tiempo de la petición en segundos
+X-Request-ID: 8f42e9c1      # id de correlación (se propaga si viene en la petición)
+```
+
+Además registra en el log el método, la ruta y el código de estado de cada petición.
+
+## Rate limiting (slowapi)
+
+| Endpoint | Límite |
+|----------|--------|
+| `POST /auth/login` | 5 / minuto |
+| `POST /auth/register` | 3 / minuto |
+| `GET /users` | 30 / minuto |
+| `POST /loans` | 10 / minuto |
+
+Al superar el límite, la API responde **429 Too Many Requests**.
 
 ## Códigos de estado
 
-| Caso | Código |
-|------|--------|
-| Registro creado | 201 Created |
-| Consulta / devolución | 200 OK |
-| Eliminación | 204 No Content |
-| Recurso no encontrado | 404 Not Found |
-| Dato duplicado (email / serial) | 400 Bad Request |
-| Regla de negocio (no disponible / ya devuelto) | 409 Conflict |
-| Datos inválidos | 422 Unprocessable Entity |
+201 creado · 200 OK · 204 sin contenido · 400 dato duplicado · 401 sin token /
+credenciales inválidas · 403 sin permisos · 404 no encontrado · 409 regla de
+negocio · 422 validación · 429 demasiadas peticiones.
 
 ## Pruebas
 
@@ -157,51 +164,55 @@ distinguir mayúsculas) y `or_()` (búsqueda en varios campos).
 uv run pytest
 ```
 
-23 pruebas automáticas (usuarios, dispositivos y préstamos) con base de datos en
-memoria aislada; cubren el CRUD, las reglas de negocio, los joins y los filtros.
+37 pruebas automáticas (auth, users, devices, loans y seguridad) con base de datos
+en memoria aislada.
 
 ## Evidencias (capturas)
 
 > Descomenta cada línea (quita `<!--` y `-->`) cuando agregues la imagen a `images/`.
 
-### 1. `alembic init`
-<!-- ![alembic init](images/alembic-init.png) -->
+### 1. Estructura del proyecto
+<!-- ![Estructura](images/estructura-ev11.png) -->
 
-### 2. `alembic revision --autogenerate`
-<!-- ![alembic revision](images/alembic-revision.png) -->
+### 2. Migración Alembic aplicada (`add authentication fields to users`)
+<!-- ![Migración auth](images/migracion-auth.png) -->
 
-### 3. `alembic upgrade head`
-<!-- ![alembic upgrade](images/alembic-upgrade.png) -->
+### 3. Registro de usuario
+<!-- ![Registro](images/registro.png) -->
 
-### 4. Estructura de tablas generadas
-<!-- ![tablas generadas](images/tablas-generadas.png) -->
+### 4. Login y token generado
+<!-- ![Login token](images/login-token.png) -->
 
-### 5. Swagger UI (Users / Devices / Loans)
-<!-- ![swagger ev10](images/swagger-ev10.png) -->
+### 5. `/auth/me`
+<!-- ![auth me](images/auth-me.png) -->
 
-### 6. Crear usuario, dispositivo y préstamo
-<!-- ![crear prestamo](images/crear-prestamo.png) -->
+### 6. Acceso sin token (401)
+<!-- ![Sin token 401](images/sin-token.png) -->
 
-### 7. Consulta con joins (`/loans/details`)
-<!-- ![joins](images/joins.png) -->
+### 7. Acceso con rol no permitido (403)
+<!-- ![Rol no permitido 403](images/rol-no-permitido.png) -->
 
-### 8. Filtros aplicados
-<!-- ![filtros](images/filtros.png) -->
+### 8. Swagger con OAuth2 (botón Authorize)
+<!-- ![Swagger OAuth2](images/swagger-oauth2.png) -->
 
-### 9. Devolución de dispositivo
-<!-- ![devolucion](images/devolucion.png) -->
+### 9. Cabeceras del middleware
+<!-- ![Middleware headers](images/middleware-headers.png) -->
 
-## Reflexión final
+### 10. Rate limiting (429)
+<!-- ![Rate limit 429](images/rate-limit.png) -->
 
-Las **migraciones con Alembic** permiten versionar la estructura de la base de datos:
-cada cambio queda registrado y se aplica de forma controlada y reproducible, sin
-perder datos ni tener que recrear tablas a mano. Las **relaciones entre modelos**
-dan integridad al sistema (un préstamo no puede existir sin un usuario y un
-dispositivo reales) y reflejan el dominio del problema. Las **consultas con joins y
-filtros** convierten datos separados en información útil —qué usuario tiene qué
-dispositivo, qué préstamos están activos, el historial de un equipo— que es,
-finalmente, lo que hace valioso a un backend.
+## Reflexión final: la importancia de la seguridad en APIs REST
+
+Una API sin seguridad expone los datos a cualquiera: sin autenticación no se sabe
+quién hace cada petición, sin hash las contraseñas quedan a la vista si se filtra
+la base de datos, y sin control de roles cualquier usuario podría borrar
+información. En esta versión, `device_systems` pasa a ser una API **protegida**:
+las contraseñas se guardan hasheadas, el acceso se controla con **tokens JWT**, las
+operaciones sensibles quedan restringidas **por rol**, el **CORS** limita qué
+frontends pueden consumirla, el **middleware** da trazabilidad para auditar y
+depurar, y el **rate limiting** frena abusos y ataques de fuerza bruta. Estas son
+las prácticas mínimas que separan un ejercicio de una API lista para el mundo real.
 
 ---
 
-📘 Guía de estudio visual del proyecto (EV07 → EV09): `guia_estudio.html`
+📘 Guía de estudio visual del proyecto: `guia_estudio.html`

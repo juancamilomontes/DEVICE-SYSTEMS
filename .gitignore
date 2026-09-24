@@ -11,3 +11,6 @@ wheels/
 
 # Base de datos local de SQLite (no se versiona: cada quien genera la suya)
 *.db
+
+# Variables de entorno con secretos (NUNCA se versiona; usar .env.example)
+.env

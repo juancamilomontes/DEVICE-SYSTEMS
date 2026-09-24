@@ -1,9 +1,11 @@
 """Rutas del recurso `loans` (préstamos): creación, devolución y consultas con joins."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
+from app.dependencies.auth_dependency import get_current_active_user, require_admin_or_support
 from app.dependencies.database_dependency import get_db
+from app.middlewares.rate_limit import limiter
 from app.models.loan_model import Loan
 from app.schemas.loan_schema import LoanCreate, LoanDetailResponse, LoanResponse
 from app.services import device_service, loan_service, user_service
@@ -36,9 +38,10 @@ def listar_prestamos(
     return loan_service.get_loans(db, status=status_, user_email=user_email, device_type=device_type)
 
 
-# --- GET /loans/details (¡antes de /{loan_id}!) -----------------------------
+# --- GET /loans/details (admin o support; antes de /{loan_id}) --------------
 @router.get("/details", response_model=list[LoanDetailResponse],
-            summary="Listar préstamos con detalle de usuario y dispositivo")
+            summary="Listar préstamos con detalle de usuario y dispositivo",
+            dependencies=[Depends(require_admin_or_support)])
 def listar_prestamos_detalle(
     status_: str | None = Query(default=None, alias="status"),
     user_email: str | None = Query(default=None),
@@ -60,12 +63,14 @@ def obtener_prestamo(loan_id: int, db: Session = Depends(get_db)):
     return _a_detalle(loan)
 
 
-# --- POST /loans ------------------------------------------------------------
+# --- POST /loans (autenticado, máx. 10/min) ---------------------------------
 @router.post("", response_model=LoanDetailResponse, status_code=status.HTTP_201_CREATED,
              summary="Registrar préstamo",
-             response_description="Préstamo creado con usuario y dispositivo")
-def crear_prestamo(datos: LoanCreate, db: Session = Depends(get_db)):
-    """Presta un dispositivo a un usuario.
+             response_description="Préstamo creado con usuario y dispositivo",
+             dependencies=[Depends(get_current_active_user)])
+@limiter.limit("10/minute")
+def crear_prestamo(request: Request, datos: LoanCreate, db: Session = Depends(get_db)):
+    """Presta un dispositivo a un usuario (requiere token).
 
     Valida que el usuario exista (404), que el dispositivo exista (404) y que
     esté disponible (409). Al crear, marca el dispositivo como no disponible.
@@ -86,12 +91,13 @@ def crear_prestamo(datos: LoanCreate, db: Session = Depends(get_db)):
     return _a_detalle(loan)
 
 
-# --- PATCH /loans/{loan_id}/return ------------------------------------------
+# --- PATCH /loans/{loan_id}/return (admin o support) ------------------------
 @router.patch("/{loan_id}/return", response_model=LoanDetailResponse,
               summary="Devolver dispositivo",
-              response_description="Préstamo marcado como devuelto")
+              response_description="Préstamo marcado como devuelto",
+              dependencies=[Depends(require_admin_or_support)])
 def devolver_prestamo(loan_id: int, db: Session = Depends(get_db)):
-    """Marca un préstamo como devuelto y libera el dispositivo.
+    """Marca un préstamo como devuelto y libera el dispositivo (admin o support).
 
     404 si el préstamo no existe; 409 si ya estaba devuelto.
     """
