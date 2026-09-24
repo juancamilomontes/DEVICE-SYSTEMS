@@ -30,6 +30,9 @@ class User(Base):
     # que impide dos usuarios con el mismo correo.
     email = Column(String, unique=True, nullable=False, index=True)
 
+    # Hash de la contraseña (NUNCA en texto plano). Se genera con passlib.
+    hashed_password = Column(String, nullable=False)
+
     # Obligatorio. Los valores permitidos (admin/support/user) los valida Pydantic.
     role = Column(String, nullable=False, default="user")
 

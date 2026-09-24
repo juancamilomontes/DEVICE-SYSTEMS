@@ -3,8 +3,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.dependencies.auth_dependency import require_admin, require_admin_or_support
 from app.dependencies.database_dependency import get_db
-from app.dependencies.user_dependencies import verify_api_key
 from app.models.device_model import Device
 from app.schemas.device_schema import DeviceCreate, DevicePatch, DeviceResponse, DeviceUpdate
 from app.schemas.loan_schema import LoanDetailResponse
@@ -49,7 +49,8 @@ def prestamos_del_dispositivo(device: Device = Depends(get_device_or_404), db: S
 
 
 @router.post("", response_model=DeviceResponse, status_code=status.HTTP_201_CREATED,
-             summary="Crear dispositivo", response_description="Dispositivo creado")
+             summary="Crear dispositivo", response_description="Dispositivo creado",
+             dependencies=[Depends(require_admin_or_support)])
 def crear_dispositivo(datos: DeviceCreate, db: Session = Depends(get_db)):
     """Crea un dispositivo. Rechaza número de serie duplicado con 400."""
     if device_service.get_device_by_serial(db, datos.serial_number):
@@ -60,7 +61,8 @@ def crear_dispositivo(datos: DeviceCreate, db: Session = Depends(get_db)):
     return device_service.create_device(db, datos)
 
 
-@router.put("/{device_id}", response_model=DeviceResponse, summary="Actualizar dispositivo (completo)")
+@router.put("/{device_id}", response_model=DeviceResponse, summary="Actualizar dispositivo (completo)",
+            dependencies=[Depends(require_admin_or_support)])
 def reemplazar_dispositivo(datos: DeviceUpdate, device: Device = Depends(get_device_or_404),
                            db: Session = Depends(get_db)):
     """Reemplaza todos los campos. 404 si no existe, 400 si el serial ya lo usa otro."""
@@ -71,7 +73,8 @@ def reemplazar_dispositivo(datos: DeviceUpdate, device: Device = Depends(get_dev
     return device_service.update_device(db, device, datos)
 
 
-@router.patch("/{device_id}", response_model=DeviceResponse, summary="Actualizar dispositivo (parcial)")
+@router.patch("/{device_id}", response_model=DeviceResponse, summary="Actualizar dispositivo (parcial)",
+              dependencies=[Depends(require_admin_or_support)])
 def actualizar_dispositivo_parcial(datos: DevicePatch, device: Device = Depends(get_device_or_404),
                                    db: Session = Depends(get_db)):
     """Actualiza solo lo enviado. PATCH vacío -> 400."""
@@ -88,9 +91,9 @@ def actualizar_dispositivo_parcial(datos: DevicePatch, device: Device = Depends(
 
 
 @router.delete("/{device_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Eliminar dispositivo",
-               dependencies=[Depends(verify_api_key)])
+               dependencies=[Depends(require_admin)])
 def eliminar_dispositivo(device: Device = Depends(get_device_or_404), db: Session = Depends(get_db)):
-    """Elimina un dispositivo. Requiere cabecera X-API-Key. 404 si no existe."""
+    """Elimina un dispositivo. Solo admin. 404 si no existe."""
     device_service.delete_device(db, device)
 
 
