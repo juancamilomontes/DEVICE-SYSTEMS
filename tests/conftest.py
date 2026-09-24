@@ -1,8 +1,8 @@
-"""Configuración compartida de las pruebas.
+"""Configuración compartida de las pruebas (base de datos en memoria + auth).
 
-Todas las pruebas usan una base de datos SQLite EN MEMORIA (aislada de
-device_systems.db). Se reemplaza get_db por una sesión de prueba y antes de
-cada test se recrean las tablas vacías.
+- BD SQLite en memoria aislada (no toca device_systems.db).
+- Rate limiting desactivado por defecto (los tests que lo prueban lo activan).
+- Fixtures que registran usuarios y devuelven cabeceras con el token JWT.
 """
 
 import pytest
@@ -15,6 +15,10 @@ import app.models  # noqa: F401  (registra User, Device y Loan)
 from app.database.connection import Base
 from app.dependencies.database_dependency import get_db
 from app.main import app
+from app.middlewares.rate_limit import limiter
+
+# Los tests normales no deben chocar con los límites de peticiones.
+limiter.enabled = False
 
 engine_test = create_engine(
     "sqlite://",
@@ -46,3 +50,32 @@ def reset_db():
 @pytest.fixture
 def client():
     return TestClient(app)
+
+
+@pytest.fixture
+def make_headers(client):
+    """Devuelve una función que registra un usuario y da sus cabeceras con token."""
+
+    def _make(email, password="Password1", role="user", name="Usuario Test"):
+        client.post("/auth/register", json={
+            "name": name, "email": email, "password": password, "role": role,
+        })
+        r = client.post("/auth/login", data={"username": email, "password": password})
+        return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+    return _make
+
+
+@pytest.fixture
+def admin_headers(make_headers):
+    return make_headers("admin@device.com", role="admin", name="Admin User")
+
+
+@pytest.fixture
+def support_headers(make_headers):
+    return make_headers("support@device.com", role="support", name="Support User")
+
+
+@pytest.fixture
+def user_headers(make_headers):
+    return make_headers("user@device.com", role="user", name="Normal User")
