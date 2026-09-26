@@ -101,6 +101,7 @@ Para usar rutas protegidas: `Authorization: Bearer <access_token>`.
 | Ruta | Protección |
 |------|------------|
 | `GET /users`, `GET /users/{id}` | Usuario autenticado |
+| `POST /users` | Admin (crea usuario con contraseña; alternativa pública: `POST /auth/register`) |
 | `PUT/PATCH/DELETE /users/{id}` | Admin |
 | `POST /devices`, `PUT /devices/{id}` | Admin o support |
 | `DELETE /devices/{id}` | Admin |
@@ -110,6 +111,10 @@ Para usar rutas protegidas: `Authorization: Bearer <access_token>`.
 
 - Sin token o token inválido → **401 Unauthorized**.
 - Autenticado pero sin el rol requerido → **403 Forbidden**.
+
+> **Filtros de préstamos:** `GET /loans` y `GET /loans/details` admiten
+> `?status=`, `?user_email=`, `?device_type=`, `?desde=` y `?hasta=` (rango de
+> fecha del préstamo, en formato ISO).
 
 ## CORS
 
@@ -225,6 +230,18 @@ en memoria aislada.
 
 **Registrar préstamo (respuesta con usuario y dispositivo anidados)**
 ![Préstamo con joins](images/Pr%C3%A9stamo%20con%20joins_POST%20loans.png)
+
+## Reflexión: migraciones, relaciones y consultas avanzadas
+
+Las **migraciones con Alembic** permiten versionar la estructura de la base de
+datos: cada cambio (crear tablas, agregar el campo `hashed_password`) queda
+registrado y se aplica de forma controlada y reproducible, sin perder datos ni
+recrear tablas a mano. Las **relaciones entre modelos** (User ↔ Loan ↔ Device con
+`ForeignKey` y `relationship`) dan **integridad referencial**: un préstamo no
+puede existir sin un usuario y un dispositivo reales. Y las **consultas con joins
+y filtros** convierten datos separados en información útil —qué usuario tiene qué
+dispositivo, qué préstamos están activos, el historial de un equipo—, que es
+finalmente lo que hace valioso a un backend.
 
 ## Reflexión final: la importancia de la seguridad en APIs REST
 
