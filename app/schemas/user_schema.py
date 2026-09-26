@@ -11,7 +11,9 @@ distintos del modelo SQLAlchemy (que define la tabla). Aquí hay 4:
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from app.auth.security import validate_password_strength
 
 
 class UserRole(str, Enum):
@@ -32,9 +34,26 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    """Entrada para POST /users (crear)."""
+    """Entrada para POST /users (un admin crea un usuario con su contraseña)."""
 
-    pass
+    password: str = Field(..., min_length=8, description="Contraseña segura del usuario")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Laura Gómez",
+                "email": "laura@sena.edu.co",
+                "password": "Password1",
+                "role": "support",
+                "is_active": True,
+            }
+        }
+    )
+
+    @field_validator("password")
+    @classmethod
+    def _password_segura(cls, v: str) -> str:
+        return validate_password_strength(v)
 
 
 class UserUpdate(UserBase):

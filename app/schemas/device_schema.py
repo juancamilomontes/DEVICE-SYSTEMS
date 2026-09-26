@@ -18,7 +18,17 @@ class DeviceBase(BaseModel):
 class DeviceCreate(DeviceBase):
     """Entrada para POST /devices."""
 
-    pass
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Laptop Lenovo ThinkPad",
+                "serial_number": "LEN-2024-001",
+                "device_type": "laptop",
+                "brand": "Lenovo",
+                "is_available": True,
+            }
+        }
+    )
 
 
 class DeviceUpdate(DeviceBase):

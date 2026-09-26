@@ -15,7 +15,7 @@ from app.dependencies.user_dependencies import get_user_or_404
 from app.middlewares.rate_limit import limiter
 from app.models.user_model import User
 from app.schemas.loan_schema import LoanDetailResponse
-from app.schemas.user_schema import UserPatch, UserResponse, UserRole, UserUpdate
+from app.schemas.user_schema import UserCreate, UserPatch, UserResponse, UserRole, UserUpdate
 from app.services import loan_service, user_service
 
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -74,6 +74,26 @@ def prestamos_del_usuario(user: User = Depends(get_user_or_404), db: Session = D
         }
         for p in prestamos
     ]
+
+
+# --- POST /users (solo admin) -----------------------------------------------
+@router.post(
+    "",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Crear usuario",
+    response_description="Usuario creado (sin exponer la contraseña)",
+    dependencies=[Depends(require_admin)],
+)
+def crear_usuario(datos: UserCreate, db: Session = Depends(get_db)):
+    """Crea un usuario (solo admin). La contraseña se guarda hasheada.
+
+    Alternativa pública de autorregistro: `POST /auth/register`.
+    """
+    if user_service.get_user_by_email(db, datos.email):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"El correo {datos.email} ya está registrado")
+    return user_service.create_user(db, datos)
 
 
 # --- PUT /users/{user_id} (solo admin) --------------------------------------

@@ -8,6 +8,7 @@ donde se toca, no en los endpoints.
 from sqlalchemy import asc
 from sqlalchemy.orm import Session
 
+from app.auth.security import get_password_hash
 from app.models.user_model import User
 from app.schemas.user_schema import UserCreate, UserUpdate
 
@@ -50,10 +51,11 @@ def get_user_by_email(db: Session, email: str) -> User | None:
 
 # --- Escritura --------------------------------------------------------------
 def create_user(db: Session, data: UserCreate) -> User:
-    """Crea un usuario nuevo en la base de datos."""
+    """Crea un usuario nuevo en la base de datos (guarda la contraseña hasheada)."""
     nuevo = User(
         name=data.name,
         email=data.email,
+        hashed_password=get_password_hash(data.password),  # nunca en texto plano
         role=data.role.value,  # el enum se guarda como texto
         is_active=data.is_active,
     )

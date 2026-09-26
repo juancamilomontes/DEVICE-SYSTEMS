@@ -1,5 +1,7 @@
 """Rutas del recurso `loans` (préstamos): creación, devolución y consultas con joins."""
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
@@ -32,10 +34,14 @@ def listar_prestamos(
     status_: str | None = Query(default=None, alias="status", description="Filtra por estado"),
     user_email: str | None = Query(default=None, description="Filtra por correo del usuario (join)"),
     device_type: str | None = Query(default=None, description="Filtra por tipo de dispositivo (join)"),
+    desde: datetime | None = Query(default=None, description="Fecha mínima del préstamo (ISO)"),
+    hasta: datetime | None = Query(default=None, description="Fecha máxima del préstamo (ISO)"),
     db: Session = Depends(get_db),
 ):
-    """Lista préstamos. Soporta `?status=`, `?user_email=`, `?device_type=`."""
-    return loan_service.get_loans(db, status=status_, user_email=user_email, device_type=device_type)
+    """Lista préstamos. Soporta `?status=`, `?user_email=`, `?device_type=`, `?desde=`, `?hasta=`."""
+    return loan_service.get_loans(
+        db, status=status_, user_email=user_email, device_type=device_type, desde=desde, hasta=hasta
+    )
 
 
 # --- GET /loans/details (admin o support; antes de /{loan_id}) --------------
@@ -46,10 +52,14 @@ def listar_prestamos_detalle(
     status_: str | None = Query(default=None, alias="status"),
     user_email: str | None = Query(default=None),
     device_type: str | None = Query(default=None),
+    desde: datetime | None = Query(default=None, description="Fecha mínima del préstamo (ISO)"),
+    hasta: datetime | None = Query(default=None, description="Fecha máxima del préstamo (ISO)"),
     db: Session = Depends(get_db),
 ):
     """Préstamos con la información relacionada (usuario + dispositivo) vía joins."""
-    prestamos = loan_service.get_loans(db, status=status_, user_email=user_email, device_type=device_type)
+    prestamos = loan_service.get_loans(
+        db, status=status_, user_email=user_email, device_type=device_type, desde=desde, hasta=hasta
+    )
     return [_a_detalle(p) for p in prestamos]
 
 

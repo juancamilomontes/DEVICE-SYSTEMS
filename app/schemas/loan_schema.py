@@ -24,6 +24,8 @@ class LoanCreate(BaseModel):
     user_id: int = Field(..., description="ID del usuario que recibe el préstamo")
     device_id: int = Field(..., description="ID del dispositivo prestado")
 
+    model_config = ConfigDict(json_schema_extra={"example": {"user_id": 1, "device_id": 3}})
+
 
 class LoanUpdate(BaseModel):
     """Entrada opcional para actualizar un préstamo (estado / fecha de devolución)."""

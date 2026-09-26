@@ -18,6 +18,17 @@ class UserRegister(BaseModel):
     password: str = Field(..., min_length=8, description="Contraseña segura")
     role: UserRole = Field(default=UserRole.user, description="admin, support o user")
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Ana Pérez",
+                "email": "ana@sena.edu.co",
+                "password": "Password1",
+                "role": "user",
+            }
+        }
+    )
+
     @field_validator("password")
     @classmethod
     def _password_segura(cls, v: str) -> str:

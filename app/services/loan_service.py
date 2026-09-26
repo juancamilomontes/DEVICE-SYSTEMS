@@ -20,11 +20,14 @@ def get_loans(
     device_type: str | None = None,
     user_id: int | None = None,
     device_id: int | None = None,
+    desde: datetime | None = None,
+    hasta: datetime | None = None,
 ) -> list[Loan]:
     """Lista préstamos con filtros opcionales.
 
     Usa JOINS a users/devices cuando se filtra por correo del usuario o por tipo
     de dispositivo. `joinedload` trae de una vez los datos relacionados.
+    `desde`/`hasta` filtran por rango de fecha del préstamo.
     """
     query = db.query(Loan).options(joinedload(Loan.user), joinedload(Loan.device))
 
@@ -40,6 +43,10 @@ def get_loans(
     if device_type is not None:
         # join con devices + filtro por tipo.
         query = query.join(Device).filter(Device.device_type == device_type)
+    if desde is not None:
+        query = query.filter(Loan.loan_date >= desde)
+    if hasta is not None:
+        query = query.filter(Loan.loan_date <= hasta)
 
     return query.order_by(Loan.loan_date.desc()).all()
 
