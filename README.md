@@ -169,37 +169,62 @@ en memoria aislada.
 
 ## Evidencias (capturas)
 
-> Descomenta cada línea (quita `<!--` y `-->`) cuando agregues la imagen a `images/`.
+### Estructura del proyecto
+![Estructura del proyecto](images/Estructura_Proyecto.png)
 
-### 1. Estructura del proyecto
-<!-- ![Estructura](images/estructura-ev11.png) -->
+![Estructura (explorador)](images/estructura.png)
 
-### 2. Migración Alembic aplicada (`add authentication fields to users`)
-<!-- ![Migración auth](images/migracion-auth.png) -->
+### Base de datos y migraciones (Alembic)
+![Base de datos generada](images/base-de-datos.png)
 
-### 3. Registro de usuario
-<!-- ![Registro](images/registro.png) -->
+![Migraciones con Alembic](images/Migraciones%20de%20Alembic.png)
 
-### 4. Login y token generado
-<!-- ![Login token](images/login-token.png) -->
+### Documentación Swagger / OpenAPI
+![Swagger completo (tags + OAuth2)](images/Swagger%20completo.png)
 
-### 5. `/auth/me`
-<!-- ![auth me](images/auth-me.png) -->
+![Swagger general](images/swagger-general.png)
 
-### 6. Acceso sin token (401)
-<!-- ![Sin token 401](images/sin-token.png) -->
+### Seguridad (autenticación, roles y rate limiting)
+**Login y token JWT**
+![Login y token](images/Login%20con%20token.png)
 
-### 7. Acceso con rol no permitido (403)
-<!-- ![Rol no permitido 403](images/rol-no-permitido.png) -->
+**Acceso denegado sin permiso (401)**
+![Acceso denegado 401](images/DELETE-ERROR-401.png)
 
-### 8. Swagger con OAuth2 (botón Authorize)
-<!-- ![Swagger OAuth2](images/swagger-oauth2.png) -->
+**Rate limiting (429 Too Many Requests)**
+![Rate limiting](images/Rate%20limiting.png)
 
-### 9. Cabeceras del middleware
-<!-- ![Middleware headers](images/middleware-headers.png) -->
+### CRUD de usuarios
+**GET /users**
+![GET usuarios](images/get-users.png)
 
-### 10. Rate limiting (429)
-<!-- ![Rate limit 429](images/rate-limit.png) -->
+**GET /users/{id}**
+![GET usuario por id](images/get-user-id.png)
+
+**POST /users (crear)**
+![POST usuarios](images/post-users.png)
+
+**PUT /users/{id}**
+![PUT usuario](images/PUT-USER-ID.png)
+
+**PATCH /users/{id}**
+![PATCH usuario](images/PATCH-USER-ID.png)
+
+**PATCH sin datos (400)**
+![PATCH sin cuerpo](images/PATCH-SIN-CUERPO.png)
+
+**DELETE /users/{id}**
+![DELETE usuario](images/DELETE-USER-ID.png)
+
+**Validación de datos (422)**
+![Error 422](images/error-422.png)
+
+### Dispositivos, préstamos y consultas con joins
+**Crear dispositivo**
+![Crear dispositivo](images/Pr%C3%A9stamo%20con%20joins_POST%20devices.png)
+
+**Registrar préstamo (respuesta con usuario y dispositivo anidados)**
+![Préstamo con joins](images/Pr%C3%A9stamo%20con%20joins_POST%20loans.png)
 
 ## Reflexión final: la importancia de la seguridad en APIs REST
 
